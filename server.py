@@ -7,8 +7,8 @@ import string
 import functools
 from datetime import datetime, timezone
 
-import psycopg2
-import psycopg2.extras
+import psycopg
+from psycopg.rows import dict_row
 
 from flask import (
     Flask, request, jsonify, render_template,
@@ -36,13 +36,12 @@ app.secret_key = SECRET_KEY
 
 def get_db():
     if "db" not in g:
-        g.db = psycopg2.connect(DATABASE_URL)
-        g.db.autocommit = False
+        g.db = psycopg.connect(DATABASE_URL, row_factory=dict_row, autocommit=False)
     return g.db
 
 
 def get_cursor(db):
-    return db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    return db.cursor()
 
 
 @app.teardown_appcontext
@@ -56,7 +55,7 @@ def init_db():
     if not DATABASE_URL:
         print("[WARN] DATABASE_URL not set — skipping DB init")
         return
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg.connect(DATABASE_URL)
     cur = conn.cursor()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS licenses (
