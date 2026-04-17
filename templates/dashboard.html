@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CafeBot License - 대시보드</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f0f13;color:#e0e0e0;font-family:'Segoe UI',sans-serif;min-height:100vh}
+a{color:#7c6fff;text-decoration:none}
+
+/* Header */
+.header{background:#1a1a24;border-bottom:1px solid #2a2a3a;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:20px;color:#fff}
+.header h1 span{color:#7c6fff}
+.header .logout{color:#888;font-size:14px;cursor:pointer;transition:color .2s}
+.header .logout:hover{color:#ff6b81}
+
+/* Container */
+.container{max-width:1400px;margin:0 auto;padding:24px 32px}
+
+/* Flash */
+.flash{background:#7c6fff22;color:#a99eff;border:1px solid #7c6fff44;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:#1a1a24;border-radius:12px;padding:20px;text-align:center;border:1px solid #2a2a3a}
+.stat-card .num{font-size:32px;font-weight:700;color:#fff}
+.stat-card .label{font-size:13px;color:#888;margin-top:4px}
+.stat-card.purple .num{color:#7c6fff}
+.stat-card.green .num{color:#4ecdc4}
+.stat-card.red .num{color:#ff6b81}
+.stat-card.yellow .num{color:#ffd93d}
+.stat-card.gray .num{color:#888}
+
+/* Toolbar */
+.toolbar{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.toolbar input[type=text]{flex:1;min-width:200px;padding:10px 14px;border:1px solid #2a2a3a;border-radius:8px;background:#12121a;color:#fff;font-size:14px;outline:none}
+.toolbar input[type=text]:focus{border-color:#7c6fff}
+.toolbar select{padding:10px 14px;border:1px solid #2a2a3a;border-radius:8px;background:#12121a;color:#fff;font-size:14px;outline:none;cursor:pointer}
+.toolbar select:focus{border-color:#7c6fff}
+.btn{padding:10px 18px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .2s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{opacity:.85}
+.btn-primary{background:linear-gradient(135deg,#7c6fff,#6a5ce7);color:#fff}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:6px}
+.btn-danger{background:#ff4d6a;color:#fff}
+.btn-warning{background:#ffd93d;color:#111}
+.btn-success{background:#4ecdc4;color:#111}
+.btn-ghost{background:#2a2a3a;color:#ccc}
+
+/* Table */
+.table-wrap{overflow-x:auto;background:#1a1a24;border-radius:12px;border:1px solid #2a2a3a}
+table{width:100%;border-collapse:collapse;font-size:14px}
+thead th{background:#12121a;padding:14px 16px;text-align:left;font-weight:600;color:#888;white-space:nowrap;border-bottom:1px solid #2a2a3a}
+tbody td{padding:12px 16px;border-bottom:1px solid #1f1f2e;vertical-align:middle}
+tbody tr:hover{background:#1f1f2e}
+tbody tr:last-child td{border-bottom:none}
+
+/* Status badges */
+.badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-active{background:#4ecdc422;color:#4ecdc4;border:1px solid #4ecdc444}
+.badge-unused{background:#7c6fff22;color:#a99eff;border:1px solid #7c6fff44}
+.badge-expired{background:#ff6b8122;color:#ff6b81;border:1px solid #ff6b8144}
+.badge-blocked{background:#ff4d6a22;color:#ff4d6a;border:1px solid #ff4d6a44}
+
+/* Modal */
+.modal-bg{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:100;justify-content:center;align-items:center}
+.modal-bg.open{display:flex}
+.modal{background:#1a1a24;border-radius:16px;padding:32px;width:400px;max-width:90vw;border:1px solid #2a2a3a}
+.modal h2{font-size:18px;margin-bottom:20px;color:#fff}
+.modal label{display:block;font-size:13px;color:#888;margin-bottom:6px;margin-top:14px}
+.modal input,.modal select{width:100%;padding:10px 14px;border:1px solid #2a2a3a;border-radius:8px;background:#12121a;color:#fff;font-size:14px;outline:none}
+.modal input:focus,.modal select:focus{border-color:#7c6fff}
+.modal .actions{display:flex;gap:10px;margin-top:24px;justify-content:flex-end}
+
+/* key display */
+.key-mono{font-family:'Consolas','Courier New',monospace;color:#7c6fff;font-weight:600;letter-spacing:.5px}
+.hwid-mono{font-family:'Consolas','Courier New',monospace;color:#888;font-size:12px}
+
+/* Responsive */
+@media(max-width:768px){
+    .container{padding:16px}
+    .header{padding:12px 16px}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .toolbar{flex-direction:column}
+    .toolbar input[type=text]{min-width:100%}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1><span>CafeBot</span> License Manager</h1>
+    <a href="{{ url_for('logout') }}" class="logout">로그아웃</a>
+</div>
+
+<div class="container">
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    {% for m in messages %}
+    <div class="flash">{{ m }}</div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- Stats -->
+    <div class="stats">
+        <div class="stat-card purple"><div class="num">{{ total }}</div><div class="label">전체 키</div></div>
+        <div class="stat-card green"><div class="num">{{ active_count }}</div><div class="label">사용 중</div></div>
+        <div class="stat-card gray"><div class="num">{{ unused_count }}</div><div class="label">미등록</div></div>
+        <div class="stat-card red"><div class="num">{{ expired_count }}</div><div class="label">만료</div></div>
+        <div class="stat-card yellow"><div class="num">{{ blocked_count }}</div><div class="label">차단</div></div>
+    </div>
+
+    <!-- Toolbar -->
+    <form class="toolbar" method="GET" action="{{ url_for('dashboard') }}">
+        <input type="text" name="q" placeholder="이름 / 라이선스 키 검색..." value="{{ q }}">
+        <select name="status" onchange="this.form.submit()">
+            <option value="">전체 상태</option>
+            <option value="사용 중" {{'selected' if status_filter=='사용 중'}}>사용 중</option>
+            <option value="미등록" {{'selected' if status_filter=='미등록'}}>미등록</option>
+            <option value="만료" {{'selected' if status_filter=='만료'}}>만료</option>
+            <option value="차단" {{'selected' if status_filter=='차단'}}>차단</option>
+        </select>
+        <button type="submit" class="btn btn-ghost">검색</button>
+        <button type="button" class="btn btn-primary" onclick="openModal('createModal')">+ 새 키 발급</button>
+    </form>
+
+    <!-- Table -->
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>이름</th>
+                    <th>라이선스 키</th>
+                    <th>PC 등록 (HWID)</th>
+                    <th>만료일</th>
+                    <th>상태</th>
+                    <th>마지막 접속</th>
+                    <th>관리</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for lic in licenses %}
+            {% set status = license_status(lic) %}
+            <tr>
+                <td>{{ lic.name }}</td>
+                <td><span class="key-mono">{{ lic.license_key }}</span></td>
+                <td>
+                    {% if lic.hwid %}
+                    <span class="hwid-mono" title="{{ lic.hwid }}">{{ lic.hwid[:12] }}...</span>
+                    {% else %}
+                    <span style="color:#555">-</span>
+                    {% endif %}
+                </td>
+                <td>{{ ts_to_str(lic.expires_at) }}</td>
+                <td>
+                    {% if status == '사용 중' %}
+                    <span class="badge badge-active">사용 중</span>
+                    {% elif status == '미등록' %}
+                    <span class="badge badge-unused">미등록</span>
+                    {% elif status == '만료' %}
+                    <span class="badge badge-expired">만료</span>
+                    {% elif status == '차단' %}
+                    <span class="badge badge-blocked">차단</span>
+                    {% endif %}
+                </td>
+                <td>{{ ts_to_str(lic.last_check) }}</td>
+                <td style="white-space:nowrap">
+                    <!-- PC Reset -->
+                    {% if lic.hwid %}
+                    <form method="POST" action="{{ url_for('reset_hwid', lid=lic.id) }}" style="display:inline" onsubmit="return confirm('PC 등록을 초기화하시겠습니까?')">
+                        <button class="btn btn-sm btn-warning" title="PC 초기화">PC 초기화</button>
+                    </form>
+                    {% endif %}
+                    <!-- Extend -->
+                    <button class="btn btn-sm btn-success" onclick="openExtend({{ lic.id }})" title="기간 연장">연장</button>
+                    <!-- Toggle -->
+                    <form method="POST" action="{{ url_for('toggle_license', lid=lic.id) }}" style="display:inline">
+                        {% if lic.active %}
+                        <button class="btn btn-sm btn-ghost" title="차단">차단</button>
+                        {% else %}
+                        <button class="btn btn-sm btn-primary" title="활성화">활성화</button>
+                        {% endif %}
+                    </form>
+                    <!-- Delete -->
+                    <form method="POST" action="{{ url_for('delete_license', lid=lic.id) }}" style="display:inline" onsubmit="return confirm('정말 삭제하시겠습니까? 복구할 수 없습니다.')">
+                        <button class="btn btn-sm btn-danger" title="삭제">삭제</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not licenses %}
+            <tr><td colspan="7" style="text-align:center;padding:40px;color:#555">등록된 라이선스가 없습니다.</td></tr>
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create Modal -->
+<div class="modal-bg" id="createModal">
+    <div class="modal">
+        <h2>새 라이선스 키 발급</h2>
+        <form method="POST" action="{{ url_for('create_license') }}">
+            <label>이름 (구매자)</label>
+            <input type="text" name="name" required placeholder="홍길동">
+            <label>기간 (일)</label>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input type="number" name="duration" min="1" max="9999" value="30" required style="flex:1">
+                <button type="button" class="btn btn-sm btn-ghost" onclick="this.form.duration.value=30">30일</button>
+                <button type="button" class="btn btn-sm btn-ghost" onclick="this.form.duration.value=90">90일</button>
+                <button type="button" class="btn btn-sm btn-ghost" onclick="this.form.duration.value=365">1년</button>
+            </div>
+            <div class="actions">
+                <button type="button" class="btn btn-ghost" onclick="closeModals()">취소</button>
+                <button type="submit" class="btn btn-primary">발급</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Extend Modal -->
+<div class="modal-bg" id="extendModal">
+    <div class="modal">
+        <h2>기간 연장</h2>
+        <form method="POST" id="extendForm">
+            <label>연장 일수</label>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input type="number" name="days" min="1" max="9999" value="30" required style="flex:1">
+                <button type="button" class="btn btn-sm btn-ghost" onclick="this.form.days.value=30">30일</button>
+                <button type="button" class="btn btn-sm btn-ghost" onclick="this.form.days.value=90">90일</button>
+                <button type="button" class="btn btn-sm btn-ghost" onclick="this.form.days.value=365">1년</button>
+            </div>
+            <div class="actions">
+                <button type="button" class="btn btn-ghost" onclick="closeModals()">취소</button>
+                <button type="submit" class="btn btn-success">연장</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openModal(id){document.getElementById(id).classList.add('open')}
+function closeModals(){document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('open'))}
+function openExtend(lid){
+    document.getElementById('extendForm').action='/admin/extend/'+lid;
+    openModal('extendModal');
+}
+document.querySelectorAll('.modal-bg').forEach(bg=>{
+    bg.addEventListener('click',e=>{if(e.target===bg)closeModals()});
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModals()});
+</script>
+
+</body>
+</html>

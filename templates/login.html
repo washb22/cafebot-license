@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CafeBot License - 로그인</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f0f13;color:#e0e0e0;font-family:'Segoe UI',sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.login-box{background:#1a1a24;border-radius:16px;padding:48px 40px;width:380px;box-shadow:0 8px 32px rgba(0,0,0,.5);text-align:center}
+.login-box h1{font-size:24px;margin-bottom:8px;color:#fff}
+.login-box .subtitle{color:#888;font-size:14px;margin-bottom:32px}
+.login-box .accent{color:#7c6fff}
+.login-box input[type=password]{width:100%;padding:14px 16px;border:1px solid #2a2a3a;border-radius:10px;background:#12121a;color:#fff;font-size:15px;outline:none;transition:border .2s}
+.login-box input[type=password]:focus{border-color:#7c6fff}
+.login-box button{width:100%;margin-top:16px;padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,#7c6fff,#6a5ce7);color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:opacity .2s}
+.login-box button:hover{opacity:.88}
+.flash{background:#ff4d6a22;color:#ff6b81;border:1px solid #ff4d6a44;border-radius:8px;padding:10px;margin-bottom:16px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="login-box">
+    <h1><span class="accent">CafeBot</span> License</h1>
+    <p class="subtitle">관리자 로그인</p>
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    {% for m in messages %}
+    <div class="flash">{{ m }}</div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+    <form method="POST">
+        <input type="password" name="password" placeholder="비밀번호 입력" autofocus required>
+        <button type="submit">로그인</button>
+    </form>
+</div>
+</body>
+</html>
