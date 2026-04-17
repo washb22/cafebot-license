@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import time
 import hmac
 import hashlib
@@ -7,6 +6,9 @@ import secrets
 import string
 import functools
 from datetime import datetime, timezone
+
+import psycopg2
+import psycopg2.extras
 
 from flask import (
     Flask, request, jsonify, render_template,
@@ -17,8 +19,7 @@ from flask import (
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-DB_PATH = os.path.join(DATA_DIR, "licenses.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "cafebot2026")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
@@ -35,9 +36,13 @@ app.secret_key = SECRET_KEY
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
+        g.db = psycopg2.connect(DATABASE_URL)
+        g.db.autocommit = False
     return g.db
+
+
+def get_cursor(db):
+    return db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
 
 @app.teardown_appcontext
@@ -48,21 +53,25 @@ def close_db(exc):
 
 
 def init_db():
-    os.makedirs(DATA_DIR, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("""
+    if not DATABASE_URL:
+        print("[WARN] DATABASE_URL not set — skipping DB init")
+        return
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS licenses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             license_key TEXT UNIQUE NOT NULL,
             hwid TEXT,
-            created_at INTEGER NOT NULL,
-            expires_at INTEGER NOT NULL,
-            last_check INTEGER,
+            created_at BIGINT NOT NULL,
+            expires_at BIGINT NOT NULL,
+            last_check BIGINT,
             active INTEGER DEFAULT 1
         )
     """)
     conn.commit()
+    cur.close()
     conn.close()
 
 
@@ -145,16 +154,16 @@ def logout():
 @login_required
 def dashboard():
     db = get_db()
+    cur = get_cursor(db)
     q = request.args.get("q", "").strip()
     status_filter = request.args.get("status", "").strip()
 
-    rows = db.execute(
-        "SELECT * FROM licenses ORDER BY created_at DESC"
-    ).fetchall()
+    cur.execute("SELECT * FROM licenses ORDER BY created_at DESC")
+    rows = cur.fetchall()
+    cur.close()
 
     # filtering
     filtered = []
-    now = int(time.time())
     for r in rows:
         s = license_status(r)
         if status_filter and s != status_filter:
@@ -199,10 +208,12 @@ def create_license():
     expires = now + duration * 86400
 
     db = get_db()
-    db.execute(
-        "INSERT INTO licenses (name, license_key, created_at, expires_at) VALUES (?, ?, ?, ?)",
+    cur = get_cursor(db)
+    cur.execute(
+        "INSERT INTO licenses (name, license_key, created_at, expires_at) VALUES (%s, %s, %s, %s)",
         (name, key, now, expires),
     )
+    cur.close()
     db.commit()
     flash(f"새 키 발급 완료: {key}")
     return redirect(url_for("dashboard"))
@@ -212,7 +223,9 @@ def create_license():
 @login_required
 def reset_hwid(lid):
     db = get_db()
-    db.execute("UPDATE licenses SET hwid = NULL WHERE id = ?", (lid,))
+    cur = get_cursor(db)
+    cur.execute("UPDATE licenses SET hwid = NULL WHERE id = %s", (lid,))
+    cur.close()
     db.commit()
     flash("PC 등록이 초기화되었습니다.")
     return redirect(url_for("dashboard"))
@@ -223,10 +236,12 @@ def reset_hwid(lid):
 def extend_license(lid):
     days = int(request.form.get("days", 30))
     db = get_db()
-    db.execute(
-        "UPDATE licenses SET expires_at = expires_at + ? WHERE id = ?",
+    cur = get_cursor(db)
+    cur.execute(
+        "UPDATE licenses SET expires_at = expires_at + %s WHERE id = %s",
         (days * 86400, lid),
     )
+    cur.close()
     db.commit()
     flash(f"{days}일 연장 완료.")
     return redirect(url_for("dashboard"))
@@ -236,12 +251,15 @@ def extend_license(lid):
 @login_required
 def toggle_license(lid):
     db = get_db()
-    row = db.execute("SELECT active FROM licenses WHERE id = ?", (lid,)).fetchone()
+    cur = get_cursor(db)
+    cur.execute("SELECT active FROM licenses WHERE id = %s", (lid,))
+    row = cur.fetchone()
     if row:
         new_val = 0 if row["active"] else 1
-        db.execute("UPDATE licenses SET active = ? WHERE id = ?", (new_val, lid))
-        db.commit()
-        flash("상태가 변경되었습니다.")
+        cur.execute("UPDATE licenses SET active = %s WHERE id = %s", (new_val, lid))
+    cur.close()
+    db.commit()
+    flash("상태가 변경되었습니다.")
     return redirect(url_for("dashboard"))
 
 
@@ -249,7 +267,9 @@ def toggle_license(lid):
 @login_required
 def delete_license(lid):
     db = get_db()
-    db.execute("DELETE FROM licenses WHERE id = ?", (lid,))
+    cur = get_cursor(db)
+    cur.execute("DELETE FROM licenses WHERE id = %s", (lid,))
+    cur.close()
     db.commit()
     flash("라이선스가 삭제되었습니다.")
     return redirect(url_for("dashboard"))
@@ -276,31 +296,38 @@ def api_activate():
             return jsonify({"success": False, "message": "서명 검증 실패"}), 403
 
     db = get_db()
-    row = db.execute(
-        "SELECT * FROM licenses WHERE license_key = ?", (license_key,)
-    ).fetchone()
+    cur = get_cursor(db)
+    cur.execute(
+        "SELECT * FROM licenses WHERE license_key = %s", (license_key,)
+    )
+    row = cur.fetchone()
 
     if not row:
+        cur.close()
         return jsonify({"success": False, "message": "유효하지 않은 라이선스 키입니다."}), 404
 
     if not row["active"]:
+        cur.close()
         return jsonify({"success": False, "message": "차단된 라이선스입니다."}), 403
 
     now = int(time.time())
     if row["expires_at"] < now:
+        cur.close()
         return jsonify({"success": False, "message": "만료된 라이선스입니다."}), 403
 
     if row["hwid"] and row["hwid"] != hwid:
+        cur.close()
         return jsonify({
             "success": False,
             "message": "이미 다른 PC에 등록된 라이선스입니다. 관리자에게 초기화를 요청하세요."
         }), 403
 
     # Bind HWID
-    db.execute(
-        "UPDATE licenses SET hwid = ?, last_check = ? WHERE id = ?",
+    cur.execute(
+        "UPDATE licenses SET hwid = %s, last_check = %s WHERE id = %s",
         (hwid, now, row["id"]),
     )
+    cur.close()
     db.commit()
 
     return jsonify({
@@ -326,27 +353,34 @@ def api_verify():
             return jsonify({"valid": False, "error": "서명 검증 실패"}), 403
 
     db = get_db()
-    row = db.execute(
-        "SELECT * FROM licenses WHERE license_key = ?", (license_key,)
-    ).fetchone()
+    cur = get_cursor(db)
+    cur.execute(
+        "SELECT * FROM licenses WHERE license_key = %s", (license_key,)
+    )
+    row = cur.fetchone()
 
     if not row:
+        cur.close()
         return jsonify({"valid": False, "error": "유효하지 않은 라이선스 키입니다."}), 404
 
     if not row["active"]:
+        cur.close()
         return jsonify({"valid": False, "error": "차단된 라이선스입니다."}), 403
 
     now = int(time.time())
     if row["expires_at"] < now:
+        cur.close()
         return jsonify({"valid": False, "error": "만료된 라이선스입니다."}), 403
 
     if row["hwid"] != hwid:
+        cur.close()
         return jsonify({"valid": False, "error": "등록되지 않은 PC입니다."}), 403
 
     # Update last_check
-    db.execute(
-        "UPDATE licenses SET last_check = ? WHERE id = ?", (now, row["id"])
+    cur.execute(
+        "UPDATE licenses SET last_check = %s WHERE id = %s", (now, row["id"])
     )
+    cur.close()
     db.commit()
 
     return jsonify({
